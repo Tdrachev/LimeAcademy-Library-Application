@@ -17,40 +17,28 @@ contract Library is Ownable{
    }
    
    Book[] private BooksInLibrary;
-   mapping (address=>uint[]) ownerToBooks;
+   //Mapping to keep track if an address has borrowed a book by id since we can only take 1 copy of a single book
+   mapping (address=>mapping(uint => bool)) ownerToBooks;
+   //Mapping to keep track of which addresses are already in the _haveBorrowedBooks array so we dont have duplicated entries
    mapping (address=>bool) ownerInArray;
    
    address[] private _haveBorrowedBooks;
    
-   uint private _bookLocationInOwnerArray =0;
+  
    
    modifier hasBook(uint _id){
-       bool _hasBook = false;
-       for(uint i = 0; i<ownerToBooks[msg.sender].length;i++){
-           if(ownerToBooks[msg.sender][i]==_id){
-               _hasBook=true;
-               _bookLocationInOwnerArray = i;
-               break;
-           }
-       }
-       require(_hasBook);
+    require(ownerToBooks[msg.sender][_id]==true);
        _;
    }
    
    modifier doesNotHaveBook(uint _id){
-       bool _hasBook = false;
-       for(uint i = 0; i<ownerToBooks[msg.sender].length;i++){
-           if(ownerToBooks[msg.sender][i]==_id){
-               _hasBook=true;
-               break;
-           }
-       }
-       require(!_hasBook);
+    require(ownerToBooks[msg.sender][_id]==false);
        _;
    }
    
    function addBookToLibrary(string memory _name,uint64 _copies) public onlyOwner{
        BooksInLibrary.push(Book(_name,_copies));
+       //We use the index of a book in the BooksInLibrary array as its id
        uint id = BooksInLibrary.length;
        emit NewBookAddedToLibrary(id,_name,_copies);
    }
@@ -71,7 +59,8 @@ contract Library is Ownable{
        
        require(BooksInLibrary[_id].Copies > 0 );
        BooksInLibrary[_id].Copies--;
-       ownerToBooks[msg.sender].push(_id);
+       ownerToBooks[msg.sender][_id]=true;
+       //No point of adding the address of the borrower to the _haveBorrowedBooks array if he already is there
        if(ownerInArray[msg.sender] == false){
        _haveBorrowedBooks.push(msg.sender);
        ownerInArray[msg.sender] = true;}
@@ -80,10 +69,7 @@ contract Library is Ownable{
    
    function returnBook(uint _id) public hasBook(_id){
        BooksInLibrary[_id].Copies++;
-       uint ownerBooksArrayLength = ownerToBooks[msg.sender].length-1;
-      ownerToBooks[msg.sender][_bookLocationInOwnerArray] = ownerToBooks[msg.sender][ownerBooksArrayLength];
-      delete ownerToBooks[msg.sender][ownerBooksArrayLength];
-       _bookLocationInOwnerArray=0;
+       ownerToBooks[msg.sender][_id] = false;
        emit BookReturned(_id,BooksInLibrary[_id].Name,BooksInLibrary[_id].Copies);
        
    }
